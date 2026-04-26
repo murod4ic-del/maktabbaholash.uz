@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id        Int       @id @default(autoincrement())
+  name      String
+  code      String    @unique
+  createdAt DateTime  @default(now())
+  teachers  Teacher[]
+  students  Student[]
+  classes   Class[]
+  subjects  Subject[]
+}
+
+model Teacher {
+  id             Int              @id @default(autoincrement())
+  fullName       String
+  login          String           @unique
+  passwordHash   String
+  phone          String           @default("")
+  schoolId       Int
+  school         School           @relation(fields: [schoolId], references: [id])
+  createdAt      DateTime         @default(now())
+  grades         Grade[]
+  teacherSubjects TeacherSubject[]
+}
+
+model Student {
+  id             Int              @id @default(autoincrement())
+  fullName       String
+  classId        Int
+  schoolId       Int
+  class          Class            @relation(fields: [classId], references: [id])
+  school         School           @relation(fields: [schoolId], references: [id])
+  createdAt      DateTime         @default(now())
+  grades         Grade[]
+  parentStudents ParentStudent[]
+}
+
+model Class {
+  id        Int       @id @default(autoincrement())
+  name      String
+  schoolId  Int
+  school    School    @relation(fields: [schoolId], references: [id])
+  students  Student[]
+  grades    Grade[]
+  teacherSubjects TeacherSubject[]
+}
+
+model Subject {
+  id        Int       @id @default(autoincrement())
+  name      String
+  schoolId  Int
+  school    School    @relation(fields: [schoolId], references: [id])
+  grades    Grade[]
+  teacherSubjects TeacherSubject[]
+}
+
+model TeacherSubject {
+  id        Int     @id @default(autoincrement())
+  teacherId Int
+  subjectId Int
+  classId   Int
+  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, subjectId, classId])
+}
+
+model Parent {
+  id             Int              @id @default(autoincrement())
+  fullName       String
+  login          String           @unique
+  passwordHash   String
+  phone          String           @default("")
+  createdAt      DateTime         @default(now())
+  parentStudents ParentStudent[]
+}
+
+model ParentStudent {
+  id        Int     @id @default(autoincrement())
+  parentId  Int
+  studentId Int
+  parent    Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+}
+
+model Grade {
+  id         Int      @id @default(autoincrement())
+  studentId  Int
+  teacherId  Int
+  subjectId  Int
+  classId    Int
+  gradeType  String   @default("daily")
+  topic      String   @default("")
+  value      Int
+  quarter    Int      @default(1)
+  note       String   @default("")
+  gradeDate  DateTime @default(now())
+  createdAt  DateTime @default(now())
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher    Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+}
+
+model Admin {
+  id           Int      @id @default(autoincrement())
+  login        String   @unique
+  passwordHash String
+  fullName     String   @default("Administrator")
+  createdAt    DateTime @default(now())
+}
