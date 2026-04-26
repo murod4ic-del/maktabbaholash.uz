@@ -43,6 +43,7 @@ export const authOptions: NextAuthOptions = {
             role: "teacher" as const,
             fullName: teacher.fullName,
             schoolId: teacher.schoolId,
+            isPrimary: teacher.isPrimary,
           };
         }
 
@@ -71,6 +72,7 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role;
         token.fullName = user.fullName;
         token.schoolId = user.schoolId;
+        token.isPrimary = user.isPrimary;
       }
       return token;
     },
@@ -81,6 +83,7 @@ export const authOptions: NextAuthOptions = {
         role: token.role,
         fullName: token.fullName,
         schoolId: token.schoolId,
+        isPrimary: token.isPrimary,
       };
       return session;
     },

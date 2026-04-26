@@ -8,6 +8,7 @@ declare module "next-auth" {
     role: "admin" | "teacher" | "parent";
     fullName: string;
     schoolId?: number;
+    isPrimary?: boolean;
   }
 
   interface Session {
@@ -17,6 +18,7 @@ declare module "next-auth" {
       role: "admin" | "teacher" | "parent";
       fullName: string;
       schoolId?: number;
+      isPrimary?: boolean;
     };
   }
 }
@@ -28,5 +30,6 @@ declare module "next-auth/jwt" {
     role: "admin" | "teacher" | "parent";
     fullName: string;
     schoolId?: number;
+    isPrimary?: boolean;
   }
 }

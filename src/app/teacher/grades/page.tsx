@@ -79,6 +79,7 @@ const quarterNames = ["I-chorak", "II-chorak", "III-chorak", "IV-chorak"];
 export default function TeacherGrades() {
   const { data: session } = useSession();
   const teacherId = session?.user?.id;
+  const isPrimary = session?.user?.isPrimary === true;
 
   const [teacherSubjects, setTeacherSubjects] = useState<TeacherSubject[]>([]);
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -109,15 +110,22 @@ export default function TeacherGrades() {
     ).values()
   );
 
-  const availableSubjects = selectedClassId
-    ? teacherSubjects
-        .filter((ts) => ts.classId === Number(selectedClassId))
-        .map((ts) => ts.subject)
+  const allSubjectsForClass = selectedClassId
+    ? Array.from(
+        new Map(
+          teacherSubjects
+            .filter((ts) => ts.classId === Number(selectedClassId))
+            .map((ts) => [ts.subject.id, ts.subject])
+        ).values()
+      )
     : [];
 
   useEffect(() => {
-    setSelectedSubjectId("");
-  }, [selectedClassId]);
+    if (!isPrimary) setSelectedSubjectId("");
+    else if (isPrimary && allSubjectsForClass.length > 0 && !selectedSubjectId) {
+      setSelectedSubjectId(String(allSubjectsForClass[0].id));
+    }
+  }, [selectedClassId, isPrimary, allSubjectsForClass.length]);
 
   const fetchStudents = useCallback(async () => {
     if (!selectedClassId) return;
@@ -147,13 +155,15 @@ export default function TeacherGrades() {
   }, [selectedClassId]);
 
   const fetchExistingGrades = useCallback(async () => {
-    if (!selectedClassId || !selectedSubjectId || !teacherId) return;
+    if (!selectedClassId || !teacherId) return;
+    const subId = isPrimary ? selectedSubjectId : selectedSubjectId;
+    if (!subId) return;
     setLoadingGrades(true);
     try {
       const params = new URLSearchParams({
         teacherId: String(teacherId),
         classId: selectedClassId,
-        subjectId: selectedSubjectId,
+        subjectId: subId,
         quarter: selectedQuarter,
       });
       const res = await fetch(`/api/grades?${params}`);
@@ -164,7 +174,7 @@ export default function TeacherGrades() {
     } finally {
       setLoadingGrades(false);
     }
-  }, [selectedClassId, selectedSubjectId, selectedQuarter, teacherId]);
+  }, [selectedClassId, selectedSubjectId, selectedQuarter, teacherId, isPrimary]);
 
   useEffect(() => {
     if (selectedClassId) {
@@ -193,7 +203,8 @@ export default function TeacherGrades() {
 
   const saveRow = async (index: number) => {
     const row = rows[index];
-    if (!row.value || !selectedSubjectId || !selectedClassId || !teacherId) return;
+    const subjectId = isPrimary ? selectedSubjectId : selectedSubjectId;
+    if (!row.value || !subjectId || !selectedClassId || !teacherId) return;
 
     const val = Number(row.value);
     if (val < 1 || val > 5) {
@@ -216,7 +227,7 @@ export default function TeacherGrades() {
         body: JSON.stringify({
           studentId: row.studentId,
           teacherId: Number(teacherId),
-          subjectId: Number(selectedSubjectId),
+          subjectId: Number(subjectId),
           classId: Number(selectedClassId),
           gradeType: row.gradeType,
           topic: row.topic,
@@ -273,7 +284,9 @@ export default function TeacherGrades() {
     }
   };
 
-  const isFormReady = selectedClassId && selectedSubjectId && students.length > 0;
+  const isFormReady = isPrimary
+    ? selectedClassId && selectedSubjectId && students.length > 0
+    : selectedClassId && selectedSubjectId && students.length > 0;
 
   if (loadingTS) {
     return (
@@ -291,11 +304,18 @@ export default function TeacherGrades() {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 lg:p-8 text-white shadow-lg">
         <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-3">
-          <span className="text-3xl">📝</span> Baho qo'yish
+          <span className="text-3xl">📝</span> Baho qo&apos;yish
         </h1>
         <p className="mt-2 text-blue-100 text-sm lg:text-base">
-          Sinf, fan va chorakni tanlang, keyin o'quvchilarga baho qo'ying
+          {isPrimary
+            ? "Sinfni va fanni tanlang — barcha fanlar ro'yxatda"
+            : "Sinf, fan va chorakni tanlang, keyin o'quvchilarga baho qo'ying"}
         </p>
+        {isPrimary && (
+          <span className="inline-block mt-2 px-3 py-1 text-xs font-medium bg-white/20 rounded-full">
+            Boshlang&apos;ich sinf o&apos;qituvchisi
+          </span>
+        )}
       </div>
 
       {/* Filters */}
@@ -303,7 +323,7 @@ export default function TeacherGrades() {
         <h2 className="text-lg font-semibold text-gray-800 mb-4">
           Parametrlarni tanlang
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className={`grid gap-4 ${isPrimary ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"}`}>
           {/* Class */}
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1.5">
@@ -323,24 +343,56 @@ export default function TeacherGrades() {
             </select>
           </div>
 
-          {/* Subject */}
+          {/* Subject — for primary: all subjects shown as tabs/select */}
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1.5">
-              Fan
+              Fan {isPrimary && <span className="text-blue-500">(barcha fanlar)</span>}
             </label>
-            <select
-              value={selectedSubjectId}
-              onChange={(e) => setSelectedSubjectId(e.target.value)}
-              disabled={!selectedClassId}
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm bg-gray-50 focus:bg-white transition-colors disabled:opacity-50"
-            >
-              <option value="">Fanni tanlang...</option>
-              {availableSubjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            {isPrimary && allSubjectsForClass.length > 6 ? (
+              <select
+                value={selectedSubjectId}
+                onChange={(e) => setSelectedSubjectId(e.target.value)}
+                disabled={!selectedClassId}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm bg-gray-50 focus:bg-white transition-colors disabled:opacity-50"
+              >
+                <option value="">Fanni tanlang...</option>
+                {allSubjectsForClass.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            ) : isPrimary && allSubjectsForClass.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {allSubjectsForClass.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setSelectedSubjectId(String(s.id))}
+                    className={`px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                      selectedSubjectId === String(s.id)
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <select
+                value={selectedSubjectId}
+                onChange={(e) => setSelectedSubjectId(e.target.value)}
+                disabled={!selectedClassId}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm bg-gray-50 focus:bg-white transition-colors disabled:opacity-50"
+              >
+                <option value="">Fanni tanlang...</option>
+                {allSubjectsForClass.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Quarter */}
@@ -371,7 +423,7 @@ export default function TeacherGrades() {
             <span>📌</span>
             <span>
               {uniqueClasses.find((c) => c.id === Number(selectedClassId))?.name} &middot;{" "}
-              {availableSubjects.find((s) => s.id === Number(selectedSubjectId))?.name} &middot;{" "}
+              {allSubjectsForClass.find((s) => s.id === Number(selectedSubjectId))?.name} &middot;{" "}
               {quarterNames[Number(selectedQuarter) - 1]}
             </span>
           </div>
@@ -392,10 +444,10 @@ export default function TeacherGrades() {
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-800">
-                Baho qo'yish
+                Baho qo&apos;yish
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                {students.length} ta o'quvchi
+                {students.length} ta o&apos;quvchi
               </p>
             </div>
             <button
@@ -417,7 +469,7 @@ export default function TeacherGrades() {
           {loadingStudents ? (
             <div className="px-6 py-12 text-center text-gray-400">
               <div className="w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3" />
-              <p>O'quvchilar yuklanmoqda...</p>
+              <p>O&apos;quvchilar yuklanmoqda...</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -425,7 +477,7 @@ export default function TeacherGrades() {
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                     <th className="px-4 py-3 text-left font-medium w-8">#</th>
-                    <th className="px-4 py-3 text-left font-medium">O'quvchi</th>
+                    <th className="px-4 py-3 text-left font-medium">O&apos;quvchi</th>
                     <th className="px-4 py-3 text-center font-medium w-20">Baho</th>
                     <th className="px-4 py-3 text-left font-medium w-36">Turi</th>
                     <th className="px-4 py-3 text-left font-medium">Mavzu</th>
@@ -537,7 +589,7 @@ export default function TeacherGrades() {
               Mavjud baholar
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              {quarterNames[Number(selectedQuarter) - 1]} uchun qo'yilgan baholar
+              {quarterNames[Number(selectedQuarter) - 1]} uchun qo&apos;yilgan baholar
             </p>
           </div>
 
@@ -549,14 +601,14 @@ export default function TeacherGrades() {
           ) : existingGrades.length === 0 ? (
             <div className="px-6 py-12 text-center text-gray-400">
               <span className="text-4xl block mb-3">📋</span>
-              <p>Bu chorak uchun hali baho qo'yilmagan</p>
+              <p>Bu chorak uchun hali baho qo&apos;yilmagan</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                    <th className="px-6 py-3 text-left font-medium">O'quvchi</th>
+                    <th className="px-6 py-3 text-left font-medium">O&apos;quvchi</th>
                     <th className="px-6 py-3 text-center font-medium">Baho</th>
                     <th className="px-6 py-3 text-left font-medium">Turi</th>
                     <th className="px-6 py-3 text-left font-medium">Mavzu</th>
@@ -608,10 +660,12 @@ export default function TeacherGrades() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center animate-fade-in stagger-2">
           <span className="text-5xl block mb-4">👆</span>
           <h3 className="text-lg font-semibold text-gray-700">
-            Avval sinf va fanni tanlang
+            Avval sinf{!isPrimary && " va fan"}ni tanlang
           </h3>
           <p className="text-sm text-gray-500 mt-1">
-            O'quvchilar ro'yxati va baho qo'yish formasini ko'rish uchun yuqoridagi parametrlarni tanlang
+            {isPrimary
+              ? "Sinfni tanlang — barcha fanlar avtomatik ko'rinadi"
+              : "O'quvchilar ro'yxati va baho qo'yish formasini ko'rish uchun yuqoridagi parametrlarni tanlang"}
           </p>
         </div>
       )}

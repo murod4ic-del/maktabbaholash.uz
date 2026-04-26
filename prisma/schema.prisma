@@ -24,6 +24,7 @@ model Teacher {
   login          String           @unique
   passwordHash   String
   phone          String           @default("")
+  isPrimary      Boolean          @default(false)
   schoolId       Int
   school         School           @relation(fields: [schoolId], references: [id])
   createdAt      DateTime         @default(now())
