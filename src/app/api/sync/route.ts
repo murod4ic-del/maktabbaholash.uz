@@ -25,20 +25,42 @@ interface SyncPayload {
   students: SyncStudent[];
 }
 
-function generateLogin(fullName: string): string {
-  return fullName
+const CYRILLIC_MAP: Record<string, string> = {
+  "\u0430": "a", "\u0431": "b", "\u0432": "v", "\u0433": "g", "\u0434": "d",
+  "\u0435": "e", "\u0451": "yo", "\u0436": "j", "\u0437": "z", "\u0438": "i",
+  "\u0439": "y", "\u043a": "k", "\u043b": "l", "\u043c": "m", "\u043d": "n",
+  "\u043e": "o", "\u043f": "p", "\u0440": "r", "\u0441": "s", "\u0442": "t",
+  "\u0443": "u", "\u0444": "f", "\u0445": "x", "\u0446": "ts", "\u0447": "ch",
+  "\u0448": "sh", "\u0449": "sh", "\u044a": "", "\u044b": "i", "\u044c": "",
+  "\u044d": "e", "\u044e": "yu", "\u044f": "ya",
+  "\u045e": "o\u02bb", "\u049b": "q", "\u0493": "g\u02bb", "\u04b3": "h",
+};
+
+function transliterate(text: string): string {
+  return text
     .toLowerCase()
-    .replace(/[^a-zA-Z0-9\s]/g, "")
-    .replace(/\s+/g, ".")
-    .replace(/[^\x00-\x7F]/g, "")
-    .slice(0, 20) || `teacher_${Date.now()}`;
+    .split("")
+    .map((ch) => CYRILLIC_MAP[ch] ?? ch)
+    .join("");
+}
+
+function generateLogin(fullName: string): string {
+  const parts = transliterate(fullName.trim())
+    .replace(/[^a-z0-9\s.]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]}.${parts[parts.length - 1]}`.slice(0, 30);
+  }
+  return parts[0]?.slice(0, 20) || `user_${Date.now()}`;
 }
 
 function generatePassword(): string {
-  const chars = "abcdefghijkmnpqrstuvwxyz23456789";
-  let pw = "";
-  for (let i = 0; i < 8; i++) pw += chars[Math.floor(Math.random() * chars.length)];
-  return pw;
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let digits = "";
+  for (let i = 0; i < 7; i++) digits += Math.floor(Math.random() * 10);
+  const letter = letters[Math.floor(Math.random() * letters.length)];
+  return digits + letter;
 }
 
 function isPrimaryClass(className: string): boolean {
@@ -186,6 +208,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const studentResults: Array<{
+      fullName: string;
+      className: string;
+      login: string;
+      password: string | null;
+      isNew: boolean;
+    }> = [];
+
     for (const s of students || []) {
       const classId = classMap[s.className];
       if (!classId) continue;
@@ -193,13 +223,53 @@ export async function POST(request: NextRequest) {
       const existing = await prisma.student.findFirst({
         where: { fullName: s.fullName, classId, schoolId: school.id },
       });
-      if (!existing) {
+      if (existing) {
+        if (!existing.login) {
+          const login = generateLogin(s.fullName);
+          const plainPw = generatePassword();
+          const pwHash = await bcrypt.hash(plainPw, 10);
+          let uniqueLogin = login;
+          let sfx = 1;
+          while (await prisma.student.findFirst({ where: { login: uniqueLogin } })) {
+            uniqueLogin = `${login}${sfx}`;
+            sfx++;
+          }
+          await prisma.student.update({
+            where: { id: existing.id },
+            data: { login: uniqueLogin, passwordHash: pwHash },
+          });
+          studentResults.push({
+            fullName: s.fullName, className: s.className,
+            login: uniqueLogin, password: plainPw, isNew: false,
+          });
+        } else {
+          studentResults.push({
+            fullName: s.fullName, className: s.className,
+            login: existing.login, password: null, isNew: false,
+          });
+        }
+      } else {
+        const login = generateLogin(s.fullName);
+        const plainPw = generatePassword();
+        const pwHash = await bcrypt.hash(plainPw, 10);
+        let uniqueLogin = login;
+        let sfx = 1;
+        while (await prisma.student.findFirst({ where: { login: uniqueLogin } })) {
+          uniqueLogin = `${login}${sfx}`;
+          sfx++;
+        }
         await prisma.student.create({
           data: {
             fullName: s.fullName,
+            login: uniqueLogin,
+            passwordHash: pwHash,
             classId,
             schoolId: school.id,
           },
+        });
+        studentResults.push({
+          fullName: s.fullName, className: s.className,
+          login: uniqueLogin, password: plainPw, isNew: true,
         });
       }
     }
@@ -211,9 +281,10 @@ export async function POST(request: NextRequest) {
         classes: Object.keys(classMap).length,
         subjects: Object.keys(subjectMap).length,
         teachers: teacherResults.length,
-        students: (students || []).length,
+        students: studentResults.length,
       },
       teachers: teacherResults,
+      students: studentResults,
     });
   } catch (error) {
     console.error("Sinxronizatsiya xatolik:", error);

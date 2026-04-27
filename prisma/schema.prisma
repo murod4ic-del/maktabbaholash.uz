@@ -35,6 +35,8 @@ model Teacher {
 model Student {
   id             Int              @id @default(autoincrement())
   fullName       String
+  login          String?          @unique
+  passwordHash   String?
   classId        Int
   schoolId       Int
   class          Class            @relation(fields: [classId], references: [id])

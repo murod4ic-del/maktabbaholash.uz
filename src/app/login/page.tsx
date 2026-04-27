@@ -1,31 +1,45 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 
-type Role = "admin" | "teacher" | "parent";
+type Role = "admin" | "teacher" | "parent" | "student";
 
 const roles: { value: Role; label: string; icon: string }[] = [
-  { value: "admin", label: "Admin", icon: "🛡️" },
+  { value: "student", label: "O'quvchi", icon: "🎒" },
   { value: "teacher", label: "O'qituvchi", icon: "📚" },
   { value: "parent", label: "Ota-ona", icon: "👨‍👩‍👧" },
+  { value: "admin", label: "Admin", icon: "🛡️" },
 ];
 
 const dashboardRoutes: Record<Role, string> = {
   admin: "/admin/dashboard",
   teacher: "/teacher/dashboard",
   parent: "/parent/dashboard",
+  student: "/student/dashboard",
 };
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const [role, setRole] = useState<Role>("teacher");
-  const [login, setLogin] = useState("");
+  const searchParams = useSearchParams();
+  const initialRole = (searchParams.get("role") as Role) || "student";
+  const initialLogin = searchParams.get("login") || "";
+  const [role, setRole] = useState<Role>(
+    roles.some((r) => r.value === initialRole) ? initialRole : "student"
+  );
+  const [login, setLogin] = useState(initialLogin);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialLogin) {
+      const pwInput = document.getElementById("password") as HTMLInputElement;
+      if (pwInput) pwInput.focus();
+    }
+  }, [initialLogin]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,5 +201,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Yuklanmoqda...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

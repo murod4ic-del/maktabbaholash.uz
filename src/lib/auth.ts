@@ -60,6 +60,22 @@ export const authOptions: NextAuthOptions = {
           };
         }
 
+        if (role === "student") {
+          const student = await prisma.student.findFirst({ where: { login } });
+          if (!student) throw new Error("O'quvchi topilmadi");
+          if (!student.passwordHash) throw new Error("O'quvchiga parol berilmagan");
+          const valid = await bcrypt.compare(password, student.passwordHash);
+          if (!valid) throw new Error("Parol noto'g'ri");
+          return {
+            id: String(student.id),
+            login: student.login!,
+            role: "student" as const,
+            fullName: student.fullName,
+            schoolId: student.schoolId,
+            classId: student.classId,
+          };
+        }
+
         throw new Error("Noto'g'ri rol");
       },
     }),
@@ -72,6 +88,7 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role;
         token.fullName = user.fullName;
         token.schoolId = user.schoolId;
+        token.classId = user.classId;
         token.isPrimary = user.isPrimary;
       }
       return token;
@@ -83,6 +100,7 @@ export const authOptions: NextAuthOptions = {
         role: token.role,
         fullName: token.fullName,
         schoolId: token.schoolId,
+        classId: token.classId,
         isPrimary: token.isPrimary,
       };
       return session;

@@ -5,9 +5,10 @@ declare module "next-auth" {
   interface User {
     id: string;
     login: string;
-    role: "admin" | "teacher" | "parent";
+    role: "admin" | "teacher" | "parent" | "student";
     fullName: string;
     schoolId?: number;
+    classId?: number;
     isPrimary?: boolean;
   }
 
@@ -15,9 +16,10 @@ declare module "next-auth" {
     user: {
       id: string;
       login: string;
-      role: "admin" | "teacher" | "parent";
+      role: "admin" | "teacher" | "parent" | "student";
       fullName: string;
       schoolId?: number;
+      classId?: number;
       isPrimary?: boolean;
     };
   }
@@ -27,9 +29,10 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     login: string;
-    role: "admin" | "teacher" | "parent";
+    role: "admin" | "teacher" | "parent" | "student";
     fullName: string;
     schoolId?: number;
+    classId?: number;
     isPrimary?: boolean;
   }
 }
