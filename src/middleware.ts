@@ -24,7 +24,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (pathname.startsWith("/admin") && token.role !== "admin") {
+  if (pathname.startsWith("/admin")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -33,6 +33,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/parent") && token.role !== "parent") {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  if (pathname.startsWith("/student") && token.role !== "student") {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

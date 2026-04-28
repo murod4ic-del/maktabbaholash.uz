@@ -9,12 +9,11 @@ export async function GET() {
       return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
     }
 
-    const schoolId = ctx.isSuperAdmin ? null : ctx.schoolId ?? -1;
-    const studentWhere = schoolId == null ? {} : { schoolId };
-    const teacherWhere = schoolId == null ? {} : { schoolId };
-    const parentWhere = schoolId == null ? {} : { schoolId };
-    const gradeWhere =
-      schoolId == null ? undefined : { student: { schoolId } };
+    const schoolId = ctx.schoolId ?? -1;
+    const studentWhere = { schoolId };
+    const teacherWhere = { schoolId };
+    const parentWhere = { schoolId };
+    const gradeWhere = { student: { schoolId } };
 
     const [totalStudents, totalTeachers, totalParents, totalGrades, avgResult] =
       await Promise.all([

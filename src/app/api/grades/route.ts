@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     if (quarter) where.quarter = Number(quarter);
     if (gradeType) where.gradeType = gradeType;
 
-    if (!ctx.isSuperAdmin && ctx.schoolId != null) {
+    if (ctx.schoolId != null) {
       where.student = { schoolId: ctx.schoolId };
     }
 

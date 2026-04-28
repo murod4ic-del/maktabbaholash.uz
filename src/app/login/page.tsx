@@ -5,17 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 
-type Role = "admin" | "teacher" | "parent" | "student";
+type Role = "teacher" | "parent" | "student";
 
 const roles: { value: Role; label: string; icon: string }[] = [
   { value: "student", label: "O'quvchi", icon: "🎒" },
   { value: "teacher", label: "O'qituvchi", icon: "📚" },
   { value: "parent", label: "Ota-ona", icon: "👨‍👩‍👧" },
-  { value: "admin", label: "Admin", icon: "🛡️" },
 ];
 
 const dashboardRoutes: Record<Role, string> = {
-  admin: "/admin/dashboard",
   teacher: "/teacher/dashboard",
   parent: "/parent/dashboard",
   student: "/student/dashboard",
@@ -51,7 +49,7 @@ function LoginForm() {
       setError("Login va parolni kiriting");
       return;
     }
-    if (role !== "admin" && !schoolCode.trim()) {
+    if (!schoolCode.trim()) {
       setError("Maktab kodini kiriting (masalan: maktab-1)");
       return;
     }
@@ -125,28 +123,26 @@ function LoginForm() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {role !== "admin" && (
-              <div>
-                <label
-                  htmlFor="schoolCode"
-                  className="block text-sm font-medium text-gray-700 mb-1.5"
-                >
-                  Maktab kodi
-                </label>
-                <input
-                  id="schoolCode"
-                  type="text"
-                  value={schoolCode}
-                  onChange={(e) => setSchoolCode(e.target.value)}
-                  placeholder="Masalan: maktab-1"
-                  autoComplete="off"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50 placeholder:text-gray-400 focus:bg-white focus:border-indigo-400 transition-colors"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Maktabingizning kodini administratordan oling
-                </p>
-              </div>
-            )}
+            <div>
+              <label
+                htmlFor="schoolCode"
+                className="block text-sm font-medium text-gray-700 mb-1.5"
+              >
+                Maktab kodi
+              </label>
+              <input
+                id="schoolCode"
+                type="text"
+                value={schoolCode}
+                onChange={(e) => setSchoolCode(e.target.value)}
+                placeholder="Masalan: maktab-1"
+                autoComplete="off"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50 placeholder:text-gray-400 focus:bg-white focus:border-indigo-400 transition-colors"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Maktabingiz dasturda kiritgan kodni yozing
+              </p>
+            </div>
             <div>
               <label
                 htmlFor="login"

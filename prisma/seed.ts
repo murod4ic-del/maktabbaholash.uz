@@ -4,18 +4,6 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminExists = await prisma.admin.findFirst();
-  if (!adminExists) {
-    await prisma.admin.create({
-      data: {
-        login: "admin",
-        passwordHash: bcrypt.hashSync("admin123", 10),
-        fullName: "Administrator",
-      },
-    });
-    console.log("Admin yaratildi: login=admin, parol=admin123");
-  }
-
   let school = await prisma.school.findFirst();
   if (!school) {
     school = await prisma.school.create({

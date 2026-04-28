@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "O'quvchi topilmadi" }, { status: 404 });
     }
 
-    if (!ctx.isSuperAdmin && ctx.schoolId != null && student.schoolId !== ctx.schoolId) {
+    if (ctx.schoolId != null && student.schoolId !== ctx.schoolId) {
       return NextResponse.json({ error: "Bu o'quvchi sizning maktabingizga tegishli emas" }, { status: 403 });
     }
     if (role === "teacher") {

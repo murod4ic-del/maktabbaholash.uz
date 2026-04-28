@@ -19,7 +19,6 @@ model School {
   classes   Class[]
   subjects  Subject[]
   parents   Parent[]
-  admins    Admin[]
 }
 
 model Teacher {
@@ -131,16 +130,6 @@ model Grade {
   teacher    Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-}
-
-model Admin {
-  id           Int      @id @default(autoincrement())
-  login        String   @unique
-  passwordHash String
-  fullName     String   @default("Administrator")
-  schoolId     Int?
-  school       School?  @relation(fields: [schoolId], references: [id])
-  createdAt    DateTime @default(now())
 }
 
 model QuarterConfig {

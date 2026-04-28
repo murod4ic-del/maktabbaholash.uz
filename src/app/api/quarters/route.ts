@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     if (classId !== null && classId !== "") {
       where.classId = classId === "null" ? null : Number(classId);
     }
-    if (!ctx.isSuperAdmin && ctx.schoolId != null) {
+    if (ctx.schoolId != null) {
       where.schoolId = ctx.schoolId;
     }
 
@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
     }
     const session = ctx.session;
-    if (session.user.role !== "teacher" && session.user.role !== "admin") {
-      return NextResponse.json({ error: "Ruxsat berilmagan" }, { status: 403 });
+    if (session.user.role !== "teacher") {
+      return NextResponse.json({ error: "Faqat o'qituvchilar chorakni belgilay oladi" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -126,8 +126,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
     }
     const session = ctx.session;
-    if (session.user.role !== "teacher" && session.user.role !== "admin") {
-      return NextResponse.json({ error: "Ruxsat berilmagan" }, { status: 403 });
+    if (session.user.role !== "teacher") {
+      return NextResponse.json({ error: "Faqat o'qituvchilar chorakni o'chira oladi" }, { status: 403 });
     }
 
     const { searchParams } = request.nextUrl;
@@ -141,11 +141,8 @@ export async function DELETE(request: NextRequest) {
     });
     if (!item) return NextResponse.json({ ok: true });
 
-    if (
-      session.user.role === "teacher" &&
-      Number(session.user.id) !== item.teacherId
-    ) {
-      return NextResponse.json({ error: "Ruxsat berilmagan" }, { status: 403 });
+    if (Number(session.user.id) !== item.teacherId) {
+      return NextResponse.json({ error: "Faqat o'zingizning chorakni o'chira olasiz" }, { status: 403 });
     }
 
     await prisma.quarterConfig.delete({ where: { id: Number(id) } });

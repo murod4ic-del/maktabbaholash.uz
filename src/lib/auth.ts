@@ -27,20 +27,6 @@ export const authOptions: NextAuthOptions = {
 
         const { login, password, role, schoolCode } = credentials;
 
-        if (role === "admin") {
-          const admin = await prisma.admin.findUnique({ where: { login } });
-          if (!admin) throw new Error("Admin topilmadi");
-          const valid = await bcrypt.compare(password, admin.passwordHash);
-          if (!valid) throw new Error("Parol noto'g'ri");
-          return {
-            id: String(admin.id),
-            login: admin.login,
-            role: "admin" as const,
-            fullName: admin.fullName,
-            schoolId: admin.schoolId ?? undefined,
-          };
-        }
-
         const schoolId = await resolveSchoolId(schoolCode);
         if (!schoolId) {
           throw new Error("Maktab kodi noto'g'ri yoki kiritilmagan");
