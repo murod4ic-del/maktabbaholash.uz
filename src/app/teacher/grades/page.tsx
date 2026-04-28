@@ -168,7 +168,10 @@ export default function TeacherGrades() {
       });
       const res = await fetch(`/api/grades?${params}`);
       const data: Grade[] = await res.json();
-      setExistingGrades(data);
+      const dailyOnly = (data || []).filter(
+        (g) => g.gradeType !== "year" && g.gradeType !== "quarter"
+      );
+      setExistingGrades(dailyOnly);
     } catch (err) {
       console.error("Baholarni yuklashda xatolik:", err);
     } finally {

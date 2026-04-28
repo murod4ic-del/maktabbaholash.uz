@@ -14,6 +14,7 @@ interface Student {
   id: number;
   fullName: string;
   classId: number;
+  photoUrl?: string | null;
   class: { id: number; name: string };
 }
 
@@ -215,15 +216,24 @@ export default function TeacherStudents() {
                         : "hover:bg-gray-50"
                     }`}
                   >
-                    <div
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
-                        selectedStudent?.id === s.id
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
-                      {s.fullName.charAt(0)}
-                    </div>
+                    {s.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={s.photoUrl}
+                        alt={s.fullName}
+                        className="w-9 h-9 rounded-full object-cover ring-2 ring-blue-100"
+                      />
+                    ) : (
+                      <div
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+                          selectedStudent?.id === s.id
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {s.fullName.charAt(0)}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-800 truncate">
                         {s.fullName}
@@ -254,9 +264,18 @@ export default function TeacherStudents() {
               {/* Student info */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-xl font-bold">
-                    {selectedStudent.fullName.charAt(0)}
-                  </div>
+                  {selectedStudent.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={selectedStudent.photoUrl}
+                      alt={selectedStudent.fullName}
+                      className="w-14 h-14 rounded-2xl object-cover ring-2 ring-blue-200"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-xl font-bold">
+                      {selectedStudent.fullName.charAt(0)}
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-xl font-bold text-gray-800">
                       {selectedStudent.fullName}

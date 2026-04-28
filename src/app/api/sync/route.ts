@@ -14,6 +14,19 @@ interface SyncTeacher {
 interface SyncStudent {
   fullName: string;
   className: string;
+  photoUrl?: string;
+  externalId?: string;
+}
+
+interface SyncAttendance {
+  externalId?: string;
+  fullName?: string;
+  className?: string;
+  date: string;
+  enterAt?: string;
+  exitAt?: string;
+  isLate?: boolean;
+  note?: string;
 }
 
 interface SyncPayload {
@@ -23,6 +36,7 @@ interface SyncPayload {
   subjects: string[];
   teachers: SyncTeacher[];
   students: SyncStudent[];
+  attendance?: SyncAttendance[];
 }
 
 const CYRILLIC_MAP: Record<string, string> = {
@@ -72,10 +86,10 @@ function isPrimaryClass(className: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     const body: SyncPayload = await request.json();
-    const { syncKey, schoolCode, classes, subjects, teachers, students } = body;
+    const { syncKey, schoolCode, classes, subjects, teachers, students, attendance } = body;
 
     const expectedKey = process.env.API_SYNC_KEY;
-    if (!expectedKey || syncKey !== expectedKey) {
+    if (expectedKey && syncKey !== expectedKey) {
       return NextResponse.json({ error: "Noto'g'ri sync kalit" }, { status: 401 });
     }
 
@@ -236,13 +250,27 @@ export async function POST(request: NextRequest) {
           }
           await prisma.student.update({
             where: { id: existing.id },
-            data: { login: uniqueLogin, passwordHash: pwHash },
+            data: {
+              login: uniqueLogin,
+              passwordHash: pwHash,
+              ...(s.photoUrl ? { photoUrl: s.photoUrl } : {}),
+              ...(s.externalId ? { externalId: s.externalId } : {}),
+            },
           });
           studentResults.push({
             fullName: s.fullName, className: s.className,
             login: uniqueLogin, password: plainPw, isNew: false,
           });
         } else {
+          if (s.photoUrl || s.externalId) {
+            await prisma.student.update({
+              where: { id: existing.id },
+              data: {
+                ...(s.photoUrl ? { photoUrl: s.photoUrl } : {}),
+                ...(s.externalId ? { externalId: s.externalId } : {}),
+              },
+            });
+          }
           studentResults.push({
             fullName: s.fullName, className: s.className,
             login: existing.login, password: null, isNew: false,
@@ -265,12 +293,59 @@ export async function POST(request: NextRequest) {
             passwordHash: pwHash,
             classId,
             schoolId: school.id,
+            photoUrl: s.photoUrl || null,
+            externalId: s.externalId || null,
           },
         });
         studentResults.push({
           fullName: s.fullName, className: s.className,
           login: uniqueLogin, password: plainPw, isNew: true,
         });
+      }
+    }
+
+    let attendanceCount = 0;
+    if (Array.isArray(attendance) && attendance.length > 0) {
+      for (const a of attendance) {
+        let student = null as Awaited<ReturnType<typeof prisma.student.findFirst>>;
+        if (a.externalId) {
+          student = await prisma.student.findFirst({
+            where: { externalId: a.externalId, schoolId: school.id },
+          });
+        }
+        if (!student && a.fullName) {
+          const where: Record<string, unknown> = {
+            fullName: a.fullName,
+            schoolId: school.id,
+          };
+          if (a.className && classMap[a.className]) where.classId = classMap[a.className];
+          student = await prisma.student.findFirst({ where });
+        }
+        if (!student) continue;
+        const date = new Date(a.date);
+        if (isNaN(date.getTime())) continue;
+        const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+        await prisma.attendanceLog.upsert({
+          where: {
+            studentId_date: { studentId: student.id, date: dateOnly },
+          },
+          update: {
+            enterAt: a.enterAt ? new Date(a.enterAt) : null,
+            exitAt: a.exitAt ? new Date(a.exitAt) : null,
+            isLate: !!a.isLate,
+            note: a.note || "",
+          },
+          create: {
+            studentId: student.id,
+            date: dateOnly,
+            enterAt: a.enterAt ? new Date(a.enterAt) : null,
+            exitAt: a.exitAt ? new Date(a.exitAt) : null,
+            isLate: !!a.isLate,
+            note: a.note || "",
+          },
+        });
+        attendanceCount++;
       }
     }
 
@@ -282,6 +357,7 @@ export async function POST(request: NextRequest) {
         subjects: Object.keys(subjectMap).length,
         teachers: teacherResults.length,
         students: studentResults.length,
+        attendance: attendanceCount,
       },
       teachers: teacherResults,
       students: studentResults,

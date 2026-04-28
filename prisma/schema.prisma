@@ -39,11 +39,15 @@ model Student {
   passwordHash   String?
   classId        Int
   schoolId       Int
+  photoUrl       String?
+  externalId     String?
+  birthDate      DateTime?
   class          Class            @relation(fields: [classId], references: [id])
   school         School           @relation(fields: [schoolId], references: [id])
   createdAt      DateTime         @default(now())
   grades         Grade[]
   parentStudents ParentStudent[]
+  attendance     AttendanceLog[]
 }
 
 model Class {
@@ -122,4 +126,34 @@ model Admin {
   passwordHash String
   fullName     String   @default("Administrator")
   createdAt    DateTime @default(now())
+}
+
+model QuarterConfig {
+  id         Int      @id @default(autoincrement())
+  schoolId   Int
+  teacherId  Int
+  subjectId  Int?
+  classId    Int?
+  quarter    Int
+  startDate  DateTime
+  endDate    DateTime
+  schoolYear String   @default("")
+  isPublished Boolean @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([teacherId, subjectId, classId, quarter, schoolYear])
+}
+
+model AttendanceLog {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  date      DateTime
+  enterAt   DateTime?
+  exitAt    DateTime?
+  isLate    Boolean  @default(false)
+  note      String   @default("")
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, date])
 }

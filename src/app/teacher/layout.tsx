@@ -7,8 +7,10 @@ import Sidebar, { type SidebarLink } from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
 
 const teacherLinks: SidebarLink[] = [
-  { href: "/teacher/dashboard", label: "Dashboard", icon: "📊" },
-  { href: "/teacher/grades", label: "Baho qo'yish", icon: "📝" },
+  { href: "/teacher/dashboard", label: "Bosh sahifa", icon: "🏠" },
+  { href: "/teacher/grades", label: "Kunlik baholar", icon: "📝" },
+  { href: "/teacher/finals", label: "Chorak / Yillik", icon: "🎯" },
+  { href: "/teacher/quarters", label: "Chorak vaqtlari", icon: "📅" },
   { href: "/teacher/students", label: "O'quvchilarim", icon: "👨‍🎓" },
 ];
 
