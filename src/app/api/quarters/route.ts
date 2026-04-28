@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 
 function currentSchoolYear(): string {
@@ -12,8 +11,8 @@ function currentSchoolYear(): string {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const ctx = await requireSession();
+    if (!ctx) {
       return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
     }
 
@@ -31,6 +30,9 @@ export async function GET(request: NextRequest) {
     if (classId !== null && classId !== "") {
       where.classId = classId === "null" ? null : Number(classId);
     }
+    if (!ctx.isSuperAdmin && ctx.schoolId != null) {
+      where.schoolId = ctx.schoolId;
+    }
 
     const items = await prisma.quarterConfig.findMany({
       where,
@@ -46,8 +48,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || (session.user.role !== "teacher" && session.user.role !== "admin")) {
+    const ctx = await requireSession();
+    if (!ctx) {
+      return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
+    }
+    const session = ctx.session;
+    if (session.user.role !== "teacher" && session.user.role !== "admin") {
       return NextResponse.json({ error: "Ruxsat berilmagan" }, { status: 403 });
     }
 
@@ -115,8 +121,12 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || (session.user.role !== "teacher" && session.user.role !== "admin")) {
+    const ctx = await requireSession();
+    if (!ctx) {
+      return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
+    }
+    const session = ctx.session;
+    if (session.user.role !== "teacher" && session.user.role !== "admin") {
       return NextResponse.json({ error: "Ruxsat berilmagan" }, { status: 403 });
     }
 

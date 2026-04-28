@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 
 const adminLinks: SidebarLink[] = [
   { href: "/admin/dashboard", label: "Dashboard", icon: "📊" },
+  { href: "/admin/schools", label: "Maktablar", icon: "🏛️" },
   { href: "/admin/teachers", label: "O'qituvchilar", icon: "👨‍🏫" },
   { href: "/admin/students", label: "O'quvchilar", icon: "👨‍🎓" },
   { href: "/admin/parents", label: "Ota-onalar", icon: "👨‍👩‍👧" },

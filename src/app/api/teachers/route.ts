@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { applySchoolFilter, requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = request.nextUrl;
-    const schoolId = searchParams.get("schoolId");
-
-    const where: Record<string, unknown> = {};
-    if (schoolId) where.schoolId = Number(schoolId);
-
+    const ctx = await requireSession();
+    if (!ctx) {
+      return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
+    }
+    const where = applySchoolFilter({}, ctx);
     const teachers = await prisma.teacher.findMany({
       where,
       select: {
@@ -20,59 +18,62 @@ export async function GET(request: NextRequest) {
         login: true,
         phone: true,
         schoolId: true,
+        isPrimary: true,
         createdAt: true,
         school: { select: { id: true, name: true } },
       },
       orderBy: { fullName: "asc" },
     });
-
     return NextResponse.json(teachers);
   } catch (error) {
     console.error("O'qituvchilarni olishda xatolik:", error);
-    return NextResponse.json(
-      { error: "O'qituvchilarni olishda xatolik yuz berdi" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "O'qituvchilarni olishda xatolik" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "admin") {
+    const ctx = await requireSession();
+    if (!ctx || !ctx.isAdmin) {
       return NextResponse.json(
-        { error: "Ruxsat berilmagan. Faqat admin o'qituvchi qo'sha oladi" },
+        { error: "Faqat admin o'qituvchi qo'sha oladi" },
         { status: 403 }
       );
     }
-
     const body = await request.json();
     const { fullName, login, password, phone, schoolId } = body;
-
-    if (!fullName || !login || !password || !schoolId) {
+    let target = Number(schoolId);
+    if (!ctx.isSuperAdmin) {
+      if (ctx.schoolId == null) {
+        return NextResponse.json({ error: "Maktab aniqlanmadi" }, { status: 400 });
+      }
+      target = ctx.schoolId;
+    }
+    if (!fullName || !login || !password || !target) {
       return NextResponse.json(
         { error: "Ism, login, parol va maktab kiritilishi shart" },
         { status: 400 }
       );
     }
 
-    const existing = await prisma.teacher.findUnique({ where: { login } });
+    const existing = await prisma.teacher.findFirst({
+      where: { login, schoolId: target },
+    });
     if (existing) {
       return NextResponse.json(
-        { error: "Bu login allaqachon mavjud" },
+        { error: "Bu login shu maktabda allaqachon mavjud" },
         { status: 409 }
       );
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-
     const teacher = await prisma.teacher.create({
       data: {
         fullName,
         login,
         passwordHash,
         phone: phone || "",
-        schoolId: Number(schoolId),
+        schoolId: target,
       },
       select: {
         id: true,
@@ -80,17 +81,14 @@ export async function POST(request: NextRequest) {
         login: true,
         phone: true,
         schoolId: true,
+        isPrimary: true,
         createdAt: true,
         school: { select: { id: true, name: true } },
       },
     });
-
     return NextResponse.json(teacher, { status: 201 });
   } catch (error) {
     console.error("O'qituvchi qo'shishda xatolik:", error);
-    return NextResponse.json(
-      { error: "O'qituvchi qo'shishda xatolik yuz berdi" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "O'qituvchi qo'shishda xatolik" }, { status: 500 });
   }
 }

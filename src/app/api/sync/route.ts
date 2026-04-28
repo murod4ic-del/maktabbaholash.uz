@@ -143,7 +143,9 @@ export async function POST(request: NextRequest) {
 
     for (const t of teachers || []) {
       let teacher = t.login
-        ? await prisma.teacher.findUnique({ where: { login: t.login } })
+        ? await prisma.teacher.findFirst({
+            where: { login: t.login, schoolId: school.id },
+          })
         : await prisma.teacher.findFirst({
             where: { fullName: t.fullName, schoolId: school.id },
           });
@@ -174,7 +176,11 @@ export async function POST(request: NextRequest) {
 
         let uniqueLogin = login;
         let suffix = 1;
-        while (await prisma.teacher.findUnique({ where: { login: uniqueLogin } })) {
+        while (
+          await prisma.teacher.findFirst({
+            where: { login: uniqueLogin, schoolId: school.id },
+          })
+        ) {
           uniqueLogin = `${login}${suffix}`;
           suffix++;
         }
@@ -244,7 +250,11 @@ export async function POST(request: NextRequest) {
           const pwHash = await bcrypt.hash(plainPw, 10);
           let uniqueLogin = login;
           let sfx = 1;
-          while (await prisma.student.findFirst({ where: { login: uniqueLogin } })) {
+          while (
+            await prisma.student.findFirst({
+              where: { login: uniqueLogin, schoolId: school.id },
+            })
+          ) {
             uniqueLogin = `${login}${sfx}`;
             sfx++;
           }
@@ -282,7 +292,11 @@ export async function POST(request: NextRequest) {
         const pwHash = await bcrypt.hash(plainPw, 10);
         let uniqueLogin = login;
         let sfx = 1;
-        while (await prisma.student.findFirst({ where: { login: uniqueLogin } })) {
+        while (
+          await prisma.student.findFirst({
+            where: { login: uniqueLogin, schoolId: school.id },
+          })
+        ) {
           uniqueLogin = `${login}${sfx}`;
           sfx++;
         }
@@ -307,7 +321,7 @@ export async function POST(request: NextRequest) {
     let attendanceCount = 0;
     if (Array.isArray(attendance) && attendance.length > 0) {
       for (const a of attendance) {
-        let student = null as Awaited<ReturnType<typeof prisma.student.findFirst>>;
+        let student: Awaited<ReturnType<typeof prisma.student.findFirst>> = null;
         if (a.externalId) {
           student = await prisma.student.findFirst({
             where: { externalId: a.externalId, schoolId: school.id },

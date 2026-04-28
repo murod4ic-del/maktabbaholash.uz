@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 
 function isPrimaryClass(className: string): boolean {
@@ -11,11 +12,22 @@ function isPrimaryClass(className: string): boolean {
 
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await requireSession();
+    if (!ctx) {
+      return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
+    }
     const { searchParams } = request.nextUrl;
     const teacherId = searchParams.get("teacherId");
 
     const where: Record<string, unknown> = {};
     if (teacherId) where.teacherId = Number(teacherId);
+    if (!ctx.isSuperAdmin && ctx.schoolId != null) {
+      where.teacher = { schoolId: ctx.schoolId };
+    }
+
+    if (ctx.session.user.role === "teacher") {
+      where.teacherId = Number(ctx.session.user.id);
+    }
 
     const teacherSubjects = await prisma.teacherSubject.findMany({
       where,

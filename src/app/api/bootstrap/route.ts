@@ -1,36 +1,57 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
 export const dynamic = "force-dynamic";
 
-const DEMO_TEACHER_LOGIN = "demo";
-const DEMO_TEACHER_PASSWORD = "Demo1234";
-const DEMO_ADMIN_LOGIN = "admin";
-const DEMO_ADMIN_PASSWORD = "admin123";
-const DEMO_SCHOOL_CODE = "demo";
-const DEMO_SCHOOL_NAME = "Demo maktab";
+const DEFAULT_TEACHER_LOGIN = "demo";
+const DEFAULT_TEACHER_PASSWORD = "Demo1234";
+const DEFAULT_ADMIN_PASSWORD = "admin123";
+const SUPER_ADMIN_LOGIN = "admin";
+const SUPER_ADMIN_PASSWORD = "admin123";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = request.nextUrl;
+    const schoolCode = (searchParams.get("school") || "demo").trim().toLowerCase();
+    const schoolName =
+      searchParams.get("name") ||
+      (schoolCode === "demo" ? "Demo maktab" : `Maktab ${schoolCode}`);
+
     let school = await prisma.school.findUnique({
-      where: { code: DEMO_SCHOOL_CODE },
+      where: { code: schoolCode },
     });
     if (!school) {
       school = await prisma.school.create({
-        data: { name: DEMO_SCHOOL_NAME, code: DEMO_SCHOOL_CODE },
+        data: { name: schoolName, code: schoolCode },
       });
     }
 
-    let admin = await prisma.admin.findUnique({
-      where: { login: DEMO_ADMIN_LOGIN },
+    let superAdmin = await prisma.admin.findUnique({
+      where: { login: SUPER_ADMIN_LOGIN },
     });
-    if (!admin) {
-      admin = await prisma.admin.create({
+    if (!superAdmin) {
+      superAdmin = await prisma.admin.create({
         data: {
-          login: DEMO_ADMIN_LOGIN,
-          passwordHash: bcrypt.hashSync(DEMO_ADMIN_PASSWORD, 10),
-          fullName: "Administrator",
+          login: SUPER_ADMIN_LOGIN,
+          passwordHash: bcrypt.hashSync(SUPER_ADMIN_PASSWORD, 10),
+          fullName: "Super Administrator",
+          schoolId: null,
+        },
+      });
+    }
+
+    const schoolAdminLogin = `admin-${schoolCode}`;
+    let schoolAdmin = await prisma.admin.findUnique({
+      where: { login: schoolAdminLogin },
+    });
+    if (!schoolAdmin) {
+      schoolAdmin = await prisma.admin.create({
+        data: {
+          login: schoolAdminLogin,
+          passwordHash: bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10),
+          fullName: `${schoolName} admin`,
+          schoolId: school.id,
         },
       });
     }
@@ -65,15 +86,15 @@ export async function GET() {
       }
     }
 
-    let teacher = await prisma.teacher.findUnique({
-      where: { login: DEMO_TEACHER_LOGIN },
+    let teacher = await prisma.teacher.findFirst({
+      where: { login: DEFAULT_TEACHER_LOGIN, schoolId: school.id },
     });
     if (!teacher) {
       teacher = await prisma.teacher.create({
         data: {
           fullName: "Demo O'qituvchi",
-          login: DEMO_TEACHER_LOGIN,
-          passwordHash: bcrypt.hashSync(DEMO_TEACHER_PASSWORD, 10),
+          login: DEFAULT_TEACHER_LOGIN,
+          passwordHash: bcrypt.hashSync(DEFAULT_TEACHER_PASSWORD, 10),
           phone: "+998900000000",
           schoolId: school.id,
           isPrimary: false,
@@ -82,7 +103,7 @@ export async function GET() {
     } else {
       teacher = await prisma.teacher.update({
         where: { id: teacher.id },
-        data: { passwordHash: bcrypt.hashSync(DEMO_TEACHER_PASSWORD, 10) },
+        data: { passwordHash: bcrypt.hashSync(DEFAULT_TEACHER_PASSWORD, 10) },
       });
     }
 
@@ -209,20 +230,27 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      message: "Demo hisoblar tayyor.",
+      message: `${school.name} uchun demo hisoblar tayyor.`,
+      school: { id: school.id, name: school.name, code: school.code },
       credentials: {
         teacher: {
-          login: DEMO_TEACHER_LOGIN,
-          password: DEMO_TEACHER_PASSWORD,
-          loginUrl: `/login?role=teacher&login=${DEMO_TEACHER_LOGIN}`,
+          login: DEFAULT_TEACHER_LOGIN,
+          password: DEFAULT_TEACHER_PASSWORD,
+          schoolCode: school.code,
+          loginUrl: `/login?role=teacher&school=${school.code}&login=${DEFAULT_TEACHER_LOGIN}`,
         },
-        admin: {
-          login: DEMO_ADMIN_LOGIN,
-          password: DEMO_ADMIN_PASSWORD,
-          loginUrl: `/login?role=admin&login=${DEMO_ADMIN_LOGIN}`,
+        schoolAdmin: {
+          login: schoolAdminLogin,
+          password: DEFAULT_ADMIN_PASSWORD,
+          loginUrl: `/login?role=admin&login=${schoolAdminLogin}`,
+        },
+        superAdmin: {
+          login: SUPER_ADMIN_LOGIN,
+          password: SUPER_ADMIN_PASSWORD,
+          note: "Faqat birinchi bootstrap chaqirilganda yaratiladi. Barcha maktablarni ko'radi.",
+          loginUrl: `/login?role=admin&login=${SUPER_ADMIN_LOGIN}`,
         },
       },
-      school: { id: school.id, name: school.name, code: school.code },
       counts: {
         classes: classes.length,
         subjects: subjects.length,

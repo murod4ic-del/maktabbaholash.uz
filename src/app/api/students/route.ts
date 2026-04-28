@@ -1,24 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import {
+  applySchoolFilter,
+  assertClassInScope,
+  requireSession,
+} from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await requireSession();
+    if (!ctx) {
+      return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
+    }
+
     const { searchParams } = request.nextUrl;
-    const classId = searchParams.get("classId");
-    const schoolId = searchParams.get("schoolId");
+    const classIdParam = searchParams.get("classId");
     const search = searchParams.get("search");
 
     const where: Record<string, unknown> = {};
-    if (classId) where.classId = Number(classId);
-    if (schoolId) where.schoolId = Number(schoolId);
+    if (classIdParam) {
+      const classId = Number(classIdParam);
+      if (!(await assertClassInScope(classId, ctx))) {
+        return NextResponse.json({ error: "Sinf topilmadi yoki ruxsat yo'q" }, { status: 404 });
+      }
+      where.classId = classId;
+    }
     if (search) {
       where.fullName = { contains: search };
     }
 
+    const finalWhere = applySchoolFilter(where, ctx);
+
     const students = await prisma.student.findMany({
-      where,
+      where: finalWhere,
       include: {
         class: { select: { id: true, name: true } },
         school: { select: { id: true, name: true } },
@@ -38,8 +52,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "admin") {
+    const ctx = await requireSession();
+    if (!ctx || !ctx.isAdmin) {
       return NextResponse.json(
         { error: "Ruxsat berilmagan. Faqat admin o'quvchi qo'sha oladi" },
         { status: 403 }
@@ -48,10 +62,24 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { fullName, classId, schoolId } = body;
+    let targetSchoolId = Number(schoolId);
+    if (!ctx.isSuperAdmin) {
+      if (ctx.schoolId == null) {
+        return NextResponse.json({ error: "Maktab aniqlanmadi" }, { status: 400 });
+      }
+      targetSchoolId = ctx.schoolId;
+    }
 
-    if (!fullName || !classId || !schoolId) {
+    if (!fullName || !classId || !targetSchoolId) {
       return NextResponse.json(
         { error: "Ism, sinf va maktab kiritilishi shart" },
+        { status: 400 }
+      );
+    }
+
+    if (!(await assertClassInScope(Number(classId), ctx))) {
+      return NextResponse.json(
+        { error: "Sinf bu maktabga tegishli emas" },
         { status: 400 }
       );
     }
@@ -60,7 +88,7 @@ export async function POST(request: NextRequest) {
       data: {
         fullName,
         classId: Number(classId),
-        schoolId: Number(schoolId),
+        schoolId: targetSchoolId,
       },
       include: {
         class: { select: { id: true, name: true } },

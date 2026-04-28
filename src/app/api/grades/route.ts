@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await requireSession();
+    if (!ctx) {
+      return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
+    }
     const { searchParams } = request.nextUrl;
     const studentId = searchParams.get("studentId");
     const teacherId = searchParams.get("teacherId");
@@ -20,6 +25,20 @@ export async function GET(request: NextRequest) {
     if (classId) where.classId = Number(classId);
     if (quarter) where.quarter = Number(quarter);
     if (gradeType) where.gradeType = gradeType;
+
+    if (!ctx.isSuperAdmin && ctx.schoolId != null) {
+      where.student = { schoolId: ctx.schoolId };
+    }
+
+    if (ctx.session.user.role === "student") {
+      where.studentId = Number(ctx.session.user.id);
+    } else if (ctx.session.user.role === "parent") {
+      const links = await prisma.parentStudent.findMany({
+        where: { parentId: Number(ctx.session.user.id) },
+        select: { studentId: true },
+      });
+      where.studentId = { in: links.map((l) => l.studentId) };
+    }
 
     const grades = await prisma.grade.findMany({
       where,

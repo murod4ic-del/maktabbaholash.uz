@@ -26,11 +26,13 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const initialRole = (searchParams.get("role") as Role) || "student";
   const initialLogin = searchParams.get("login") || "";
+  const initialSchool = searchParams.get("school") || "";
   const [role, setRole] = useState<Role>(
     roles.some((r) => r.value === initialRole) ? initialRole : "student"
   );
   const [login, setLogin] = useState(initialLogin);
   const [password, setPassword] = useState("");
+  const [schoolCode, setSchoolCode] = useState(initialSchool);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -49,6 +51,10 @@ function LoginForm() {
       setError("Login va parolni kiriting");
       return;
     }
+    if (role !== "admin" && !schoolCode.trim()) {
+      setError("Maktab kodini kiriting (masalan: maktab-1)");
+      return;
+    }
 
     setLoading(true);
 
@@ -57,6 +63,7 @@ function LoginForm() {
         login: login.trim(),
         password,
         role,
+        schoolCode: schoolCode.trim(),
         redirect: false,
       });
 
@@ -118,6 +125,28 @@ function LoginForm() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
+            {role !== "admin" && (
+              <div>
+                <label
+                  htmlFor="schoolCode"
+                  className="block text-sm font-medium text-gray-700 mb-1.5"
+                >
+                  Maktab kodi
+                </label>
+                <input
+                  id="schoolCode"
+                  type="text"
+                  value={schoolCode}
+                  onChange={(e) => setSchoolCode(e.target.value)}
+                  placeholder="Masalan: maktab-1"
+                  autoComplete="off"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50 placeholder:text-gray-400 focus:bg-white focus:border-indigo-400 transition-colors"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Maktabingizning kodini administratordan oling
+                </p>
+              </div>
+            )}
             <div>
               <label
                 htmlFor="login"

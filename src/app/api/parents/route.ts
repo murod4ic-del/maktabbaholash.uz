@@ -1,17 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import {
+  applySchoolFilter,
+  assertStudentInScope,
+  requireSession,
+} from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
 export async function GET() {
   try {
+    const ctx = await requireSession();
+    if (!ctx) {
+      return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
+    }
+    const where = applySchoolFilter({}, ctx);
     const parents = await prisma.parent.findMany({
+      where,
       select: {
         id: true,
         fullName: true,
         login: true,
         phone: true,
+        schoolId: true,
         createdAt: true,
         parentStudents: {
           include: {
@@ -21,49 +31,67 @@ export async function GET() {
       },
       orderBy: { fullName: "asc" },
     });
-
     return NextResponse.json(parents);
   } catch (error) {
     console.error("Ota-onalarni olishda xatolik:", error);
-    return NextResponse.json(
-      { error: "Ota-onalarni olishda xatolik yuz berdi" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Ota-onalarni olishda xatolik" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "admin") {
+    const ctx = await requireSession();
+    if (!ctx || !ctx.isAdmin) {
       return NextResponse.json(
-        { error: "Ruxsat berilmagan. Faqat admin ota-ona qo'sha oladi" },
+        { error: "Faqat admin ota-ona qo'sha oladi" },
         { status: 403 }
       );
     }
 
     const body = await request.json();
-    const { fullName, login, password, phone, studentIds } = body as {
+    const { fullName, login, password, phone, studentIds, schoolId } = body as {
       fullName: string;
       login: string;
       password: string;
       phone?: string;
       studentIds?: number[];
+      schoolId?: number;
     };
 
-    if (!fullName || !login || !password) {
+    let target = Number(schoolId);
+    if (!ctx.isSuperAdmin) {
+      if (ctx.schoolId == null) {
+        return NextResponse.json({ error: "Maktab aniqlanmadi" }, { status: 400 });
+      }
+      target = ctx.schoolId;
+    }
+
+    if (!fullName || !login || !password || !target) {
       return NextResponse.json(
-        { error: "Ism, login va parol kiritilishi shart" },
+        { error: "Ism, login, parol va maktab kiritilishi shart" },
         { status: 400 }
       );
     }
 
-    const existing = await prisma.parent.findUnique({ where: { login } });
+    const existing = await prisma.parent.findFirst({
+      where: { login, schoolId: target },
+    });
     if (existing) {
       return NextResponse.json(
-        { error: "Bu login allaqachon mavjud" },
+        { error: "Bu login shu maktabda allaqachon mavjud" },
         { status: 409 }
       );
+    }
+
+    if (studentIds && studentIds.length > 0) {
+      for (const sid of studentIds) {
+        if (!(await assertStudentInScope(Number(sid), ctx))) {
+          return NextResponse.json(
+            { error: `O'quvchi #${sid} bu maktabga tegishli emas` },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -74,12 +102,11 @@ export async function POST(request: NextRequest) {
         login,
         passwordHash,
         phone: phone || "",
+        schoolId: target,
         parentStudents:
           studentIds && studentIds.length > 0
             ? {
-                create: studentIds.map((sid: number) => ({
-                  studentId: sid,
-                })),
+                create: studentIds.map((sid: number) => ({ studentId: Number(sid) })),
               }
             : undefined,
       },
@@ -88,11 +115,10 @@ export async function POST(request: NextRequest) {
         fullName: true,
         login: true,
         phone: true,
+        schoolId: true,
         createdAt: true,
         parentStudents: {
-          include: {
-            student: { select: { id: true, fullName: true } },
-          },
+          include: { student: { select: { id: true, fullName: true } } },
         },
       },
     });
@@ -100,9 +126,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(parent, { status: 201 });
   } catch (error) {
     console.error("Ota-ona qo'shishda xatolik:", error);
-    return NextResponse.json(
-      { error: "Ota-ona qo'shishda xatolik yuz berdi" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Ota-ona qo'shishda xatolik" }, { status: 500 });
   }
 }

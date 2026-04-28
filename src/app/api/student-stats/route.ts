@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const ctx = await requireSession();
+    if (!ctx) {
       return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
     }
+    const { session } = ctx;
 
     const { searchParams } = request.nextUrl;
     const studentIdParam = searchParams.get("studentId");
@@ -39,6 +39,19 @@ export async function GET(request: NextRequest) {
     });
     if (!student) {
       return NextResponse.json({ error: "O'quvchi topilmadi" }, { status: 404 });
+    }
+
+    if (!ctx.isSuperAdmin && ctx.schoolId != null && student.schoolId !== ctx.schoolId) {
+      return NextResponse.json({ error: "Bu o'quvchi sizning maktabingizga tegishli emas" }, { status: 403 });
+    }
+    if (role === "teacher") {
+      const tsLink = await prisma.teacherSubject.findFirst({
+        where: { teacherId: Number(session.user.id), classId: student.classId },
+        select: { id: true },
+      });
+      if (!tsLink) {
+        return NextResponse.json({ error: "Bu o'quvchi sizning sinflaringizga tegishli emas" }, { status: 403 });
+      }
     }
 
     const grades = await prisma.grade.findMany({
