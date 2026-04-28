@@ -1,29 +1,28 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = request.nextUrl;
-    const schoolId = searchParams.get("schoolId");
+    const ctx = await requireSession();
+    if (!ctx) {
+      return NextResponse.json({ error: "Avtorizatsiyadan o'tilmagan" }, { status: 401 });
+    }
 
-    const where = schoolId ? { schoolId: Number(schoolId) } : {};
+    const schoolId = ctx.isSuperAdmin ? null : ctx.schoolId ?? -1;
+    const studentWhere = schoolId == null ? {} : { schoolId };
+    const teacherWhere = schoolId == null ? {} : { schoolId };
+    const parentWhere = schoolId == null ? {} : { schoolId };
+    const gradeWhere =
+      schoolId == null ? undefined : { student: { schoolId } };
 
     const [totalStudents, totalTeachers, totalParents, totalGrades, avgResult] =
       await Promise.all([
-        prisma.student.count({ where }),
-        prisma.teacher.count({ where }),
-        prisma.parent.count(),
-        prisma.grade.count({
-          where: schoolId
-            ? { student: { schoolId: Number(schoolId) } }
-            : undefined,
-        }),
-        prisma.grade.aggregate({
-          _avg: { value: true },
-          where: schoolId
-            ? { student: { schoolId: Number(schoolId) } }
-            : undefined,
-        }),
+        prisma.student.count({ where: studentWhere }),
+        prisma.teacher.count({ where: teacherWhere }),
+        prisma.parent.count({ where: parentWhere }),
+        prisma.grade.count({ where: gradeWhere }),
+        prisma.grade.aggregate({ _avg: { value: true }, where: gradeWhere }),
       ]);
 
     return NextResponse.json({

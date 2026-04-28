@@ -32,6 +32,9 @@ interface SyncAttendance {
 interface SyncPayload {
   syncKey: string;
   schoolCode: string;
+  schoolName?: string;
+  schoolAddress?: string;
+  schoolPhone?: string;
   classes: string[];
   subjects: string[];
   teachers: SyncTeacher[];
@@ -86,7 +89,18 @@ function isPrimaryClass(className: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     const body: SyncPayload = await request.json();
-    const { syncKey, schoolCode, classes, subjects, teachers, students, attendance } = body;
+    const {
+      syncKey,
+      schoolCode,
+      schoolName,
+      schoolAddress,
+      schoolPhone,
+      classes,
+      subjects,
+      teachers,
+      students,
+      attendance,
+    } = body;
 
     const expectedKey = process.env.API_SYNC_KEY;
     if (expectedKey && syncKey !== expectedKey) {
@@ -100,8 +114,27 @@ export async function POST(request: NextRequest) {
     let school = await prisma.school.findUnique({ where: { code: schoolCode } });
     if (!school) {
       school = await prisma.school.create({
-        data: { name: schoolCode, code: schoolCode },
+        data: {
+          name: (schoolName && schoolName.trim()) || schoolCode,
+          code: schoolCode,
+          address: schoolAddress?.trim() || "",
+          phone: schoolPhone?.trim() || "",
+        },
       });
+    } else {
+      const updates: Record<string, string> = {};
+      if (schoolName && schoolName.trim() && schoolName.trim() !== school.name) {
+        updates.name = schoolName.trim();
+      }
+      if (schoolAddress !== undefined && schoolAddress.trim() !== school.address) {
+        updates.address = schoolAddress.trim();
+      }
+      if (schoolPhone !== undefined && schoolPhone.trim() !== school.phone) {
+        updates.phone = schoolPhone.trim();
+      }
+      if (Object.keys(updates).length > 0) {
+        school = await prisma.school.update({ where: { id: school.id }, data: updates });
+      }
     }
 
     const classMap: Record<string, number> = {};

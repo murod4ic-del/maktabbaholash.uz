@@ -1,178 +1,80 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState } from "react";
+import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 
 interface Student {
   id: number;
   fullName: string;
+  login: string | null;
+  classId: number;
+  schoolId: number;
+  photoUrl: string | null;
   createdAt: string;
   class?: { id: number; name: string };
+  school?: { id: number; name: string };
 }
 
 interface ClassItem {
   id: number;
   name: string;
-  _count?: { students: number };
 }
 
-const SCHOOL_ID = 1;
-
-export default function StudentsPage() {
+export default function AdminStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
-
-  const [filterClassId, setFilterClassId] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [form, setForm] = useState({ fullName: "", classId: "" });
-
-  const fetchStudents = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({ schoolId: String(SCHOOL_ID) });
-      if (filterClassId) params.set("classId", filterClassId);
-      if (searchQuery.trim()) params.set("search", searchQuery.trim());
-
-      const res = await fetch(`/api/students?${params}`);
-      if (!res.ok) throw new Error();
-      setStudents(await res.json());
-    } catch {
-      setError("O'quvchilarni yuklashda xatolik yuz berdi");
-    } finally {
-      setLoading(false);
-    }
-  }, [filterClassId, searchQuery]);
+  const [search, setSearch] = useState("");
+  const [classFilter, setClassFilter] = useState("");
 
   useEffect(() => {
-    fetchClasses();
+    (async () => {
+      try {
+        const [sRes, cRes] = await Promise.all([
+          fetch("/api/students"),
+          fetch("/api/classes"),
+        ]);
+        if (sRes.ok) setStudents(await sRes.json());
+        if (cRes.ok) setClasses(await cRes.json());
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  useEffect(() => {
-    fetchStudents();
-  }, [fetchStudents]);
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  async function fetchClasses() {
-    try {
-      const res = await fetch(`/api/classes?schoolId=${SCHOOL_ID}`);
-      if (!res.ok) throw new Error();
-      setClasses(await res.json());
-    } catch {
-      /* classes will remain empty */
-    }
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/students", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: form.fullName,
-          classId: Number(form.classId),
-          schoolId: SCHOOL_ID,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Xatolik yuz berdi");
-      }
-
-      setForm({ fullName: "", classId: "" });
-      setShowModal(false);
-      setToast({
-        message: "O'quvchi muvaffaqiyatli qo'shildi!",
-        type: "success",
-      });
-      fetchStudents();
-    } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : "O'quvchi qo'shishda xatolik",
-        type: "error",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString("uz-UZ", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  }
+  const filtered = students.filter((s) => {
+    if (classFilter && String(s.classId) !== classFilter) return false;
+    if (
+      search.trim() &&
+      !s.fullName.toLowerCase().includes(search.toLowerCase()) &&
+      !(s.login || "").toLowerCase().includes(search.toLowerCase())
+    )
+      return false;
+    return true;
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">O&apos;quvchilar</h1>
-          <p className="text-gray-500 mt-1">
-            Barcha o&apos;quvchilar ro&apos;yxati va boshqaruv
-          </p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-        >
-          <span className="text-lg">+</span>
-          Yangi o&apos;quvchi
-        </button>
+    <div className="space-y-5 max-w-7xl mx-auto">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">O&apos;quvchilar</h1>
+        <p className="text-gray-500 text-sm mt-0.5">
+          Dasturda terminaldan ro&apos;yxatga olingan o&apos;quvchilar
+        </p>
       </div>
 
-      {toast && (
-        <div
-          className={`px-4 py-3 rounded-lg text-sm font-medium ${
-            toast.type === "success"
-              ? "bg-green-50 border border-green-200 text-green-700"
-              : "bg-red-50 border border-red-200 text-red-700"
-          }`}
-        >
-          {toast.message}
-        </div>
-      )}
+      <ReadOnlyBanner />
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
-
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-            🔍
-          </span>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Ism bo'yicha qidirish..."
-            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-          />
-        </div>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Qidirish: ism yoki login..."
+          className="flex-1 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white px-4 py-2.5 text-sm outline-none focus:border-indigo-400"
+        />
         <select
-          value={filterClassId}
-          onChange={(e) => setFilterClassId(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none min-w-[160px]"
+          value={classFilter}
+          onChange={(e) => setClassFilter(e.target.value)}
+          className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm"
         >
           <option value="">Barcha sinflar</option>
           {classes.map((c) => (
@@ -181,152 +83,63 @@ export default function StudentsPage() {
             </option>
           ))}
         </select>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">
-                  #
-                </th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">
-                  F.I.Sh
-                </th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">
-                  Sinf
-                </th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">
-                  Qo&apos;shilgan sana
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-gray-100">
-                    {Array.from({ length: 4 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3">
-                        <div className="h-4 bg-gray-200 rounded animate-pulse w-24" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : students.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-8 text-center text-gray-400"
-                  >
-                    {searchQuery || filterClassId
-                      ? "Hech qanday natija topilmadi"
-                      : "Hali o'quvchi qo'shilmagan"}
-                  </td>
-                </tr>
-              ) : (
-                students.map((s, idx) => (
-                  <tr
-                    key={s.id}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-4 py-3 text-gray-500">{idx + 1}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {s.fullName}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">
-                        {s.class?.name || "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {formatDate(s.createdAt)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="px-4 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 text-sm font-medium whitespace-nowrap">
+          {filtered.length} ta
         </div>
-        {!loading && students.length > 0 && (
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-500">
-            Jami: {students.length} ta o&apos;quvchi
-          </div>
-        )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setShowModal(false)}
-          />
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Yangi o&apos;quvchi qo&apos;shish
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+      {loading ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="h-32 rounded-2xl bg-gray-100 animate-pulse" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
+          <span className="text-5xl block mb-4">👨‍🎓</span>
+          <p className="text-gray-500 text-sm">
+            O&apos;quvchilar topilmadi. Dasturda terminallarga yuzlarni ro&apos;yxatga oling va sinxronlang.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {filtered.map((s) => {
+            const initials = s.fullName
+              .split(/\s+/)
+              .map((p) => p[0])
+              .filter(Boolean)
+              .slice(0, 2)
+              .join("")
+              .toUpperCase();
+            return (
+              <div
+                key={s.id}
+                className="bg-white rounded-2xl border border-gray-100 p-3 shadow-sm hover:shadow-md transition text-center"
               >
-                ×
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  F.I.Sh (to&apos;liq ism)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={form.fullName}
-                  onChange={(e) =>
-                    setForm({ ...form, fullName: e.target.value })
-                  }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                  placeholder="Ism Familiya"
-                />
+                {s.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={s.photoUrl}
+                    alt={s.fullName}
+                    className="w-16 h-16 rounded-full mx-auto object-cover border-2 border-gray-100"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full mx-auto bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center font-semibold text-lg">
+                    {initials || "?"}
+                  </div>
+                )}
+                <h3 className="mt-2 font-medium text-gray-800 text-sm truncate">{s.fullName}</h3>
+                <p className="text-xs text-gray-400 truncate">
+                  {s.class?.name || `Sinf #${s.classId}`}
+                </p>
+                {s.login && (
+                  <code className="text-[10px] text-indigo-600 font-mono mt-1 block truncate">
+                    {s.login}
+                  </code>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sinf
-                </label>
-                <select
-                  required
-                  value={form.classId}
-                  onChange={(e) =>
-                    setForm({ ...form, classId: e.target.value })
-                  }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                >
-                  <option value="">Sinfni tanlang</option>
-                  {classes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                >
-                  {submitting ? "Saqlanmoqda..." : "Saqlash"}
-                </button>
-              </div>
-            </form>
-          </div>
+            );
+          })}
         </div>
       )}
     </div>

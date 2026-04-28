@@ -10,8 +10,6 @@ interface Stats {
   averageGrade: number;
 }
 
-const SCHOOL_ID = 1;
-
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +21,7 @@ export default function DashboardPage() {
 
   async function fetchStats() {
     try {
-      const res = await fetch(`/api/stats?schoolId=${SCHOOL_ID}`);
+      const res = await fetch(`/api/stats`);
       if (!res.ok) throw new Error("Statistikani olishda xatolik");
       const data = await res.json();
       setStats(data);
@@ -164,21 +162,24 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">
-            Tizim haqida
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200 p-6">
+          <h2 className="text-lg font-semibold text-amber-900 mb-2 flex items-center gap-2">
+            <span>🔒</span> Asosiy boshqaruv — AccessUZ dasturida
           </h2>
-          <div className="space-y-3 text-sm text-gray-600">
+          <div className="space-y-2 text-sm text-amber-900">
             <p>
-              Bu tizim maktab boshqaruvi uchun yaratilgan. Admin sifatida siz
-              quyidagi amallarni bajarishingiz mumkin:
+              Maktab, o&apos;qituvchilar, o&apos;quvchilar, sinflar va fanlar AccessUZ
+              desktop dasturida boshqariladi. Web sahifa faqat ko&apos;rsatadi.
             </p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>O&apos;qituvchilar, o&apos;quvchilar va ota-onalarni boshqarish</li>
-              <li>Sinflar va fanlarni yaratish</li>
-              <li>O&apos;qituvchilarga fan va sinf biriktirish</li>
-              <li>Baholar statistikasini ko&apos;rish</li>
+            <ul className="list-disc list-inside space-y-1 text-xs text-amber-800">
+              <li>O&apos;quvchilar terminaldan yuz orqali ro&apos;yxatga olinadi</li>
+              <li>O&apos;qituvchilarga sinflar/fanlar dasturda biriktiriladi</li>
+              <li>Davomat va kechikishlar avtomatik web&apos;ga yuboriladi</li>
+              <li>O&apos;qituvchilar baholarni faqat web saytda qo&apos;yadi</li>
             </ul>
+            <p className="text-xs text-amber-800 pt-2 border-t border-amber-200">
+              Yangi ma&apos;lumotlarni yuborish uchun dasturning «Web sinxron» bo&apos;limini ishlatang.
+            </p>
           </div>
         </div>
       </div>
